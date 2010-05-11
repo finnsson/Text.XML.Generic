@@ -54,7 +54,7 @@ turns into
 
 while
 
-    decodeXML "<Test><String>foo</String><String>bar</String></Test"
+    decodeXML "<Test><String>foo</String><String>bar</String></Test" :: Test
 
 turns into
 

@@ -1,9 +1,13 @@
-{-# LANGUAGE DeriveDataTypeable, PackageImports #-}
+{-# LANGUAGE DeriveDataTypeable, PackageImports, GADTs, RankNTypes #-}
 module Text.XML.Generic (
+  decodeUnknownXML,
+  fromUnknownXML,
   decodeXML,
   fromXML,
+  encodeUnknownXML,
   encodeXML,
-  toXML
+  toXML,
+  DataBox (..)
   )  where
 
 import Text.XML.Light
@@ -22,6 +26,9 @@ import qualified Data.IntSet as I
 import Char
 
 import "mtl" Control.Monad.State
+
+decodeUnknownXML :: String -> DataBox
+decodeUnknownXML xml = maybe undefined fromUnknownXML (parseXMLDoc xml)
 
 decodeXML :: Data a => String -> a
 decodeXML xml = maybe undefined fromXML (parseXMLDoc xml)
@@ -46,6 +53,28 @@ stringFromXML x = res
 type F a = Element -> a
 
 
+fromUnknownXML :: Element -> DataBox
+fromUnknownXML x = res
+  where
+    res = evalState ( fromConstrM f con ) children
+        where f :: (Data a) => State [Element] a
+              f = do es <- get
+                     do put (tail es)
+                        return $ fromXML (head es)
+    -- get type of first term from e
+    qname = qName $ elName x
+    xmlnss = filter (\(Attr k v) -> "xmlns" == (qName k))  $ elAttribs x
+    name = (if length xmlnss == 1 then (attrVal $ head xmlnss) ++ "." else "") ++ qname
+    -- 
+    myDataType :: DataType
+    myDataType = dataTypeOf res
+
+    children :: [Element]
+    children = [e | Elem e <- (elContent x)]
+
+    con :: Constr
+    con = fromMaybe undefined $ readConstr myDataType qname
+
 fromXML :: Data d => Element -> d
 fromXML e = fromXML'' e'
   where
@@ -54,6 +83,7 @@ fromXML e = fromXML'' e'
       `extR` stringFromXML
       `extR` (primitiveFromXML :: F Integer )
       `extR` (primitiveFromXML :: F Int)
+      `extR` (primitiveFromXML :: F Bool)
       `extR` (primitiveFromXML :: F Word8)
       `extR` (primitiveFromXML :: F Word16)
       `extR` (primitiveFromXML :: F Word32)
@@ -103,6 +133,11 @@ fromXML' x = res
     myDataType = dataTypeOf res
     
 
+encodeUnknownXML :: DataBox -> String
+encodeUnknownXML (DataBox b) =  encodeXML b --showElement $ toXML b
+
+toUnknownXML :: DataBox -> Element
+toUnknownXML (DataBox b) = toXML b
 
 -- \ Encode a Data into a String.
 -- .
@@ -136,6 +171,7 @@ toXML = toXMLgeneric
         `ext1Q` xmlList
 	`extQ` (showXmlString :: T String)
         `extQ` (showXmlUnit :: T ())
+        `extQ` (showXml :: T Bool)
 	`extQ` (showXml :: T Integer)
         `extQ` (showXml :: T Int)
 	`extQ` (showXml :: T Char)
@@ -209,6 +245,34 @@ element name ns content =
     namespace =
       case ns of
         Nothing -> []
-        Just n -> [Attr (QName "xmlns" Nothing Nothing) ("http://www.haskell.org/hoogle/?hoogle=" ++ n)]
+        Just n -> [Attr (QName "xmlns" Nothing Nothing) n] -- ("http://www.haskell.org/hoogle/?hoogle=" ++ n)]
 
-contentText c = [Text (CData CDataText c Nothing)] 
+contentText c = [Text (CData CDataText c Nothing)]
+
+
+-- Data type
+
+data DataBox where
+  DataBox :: (Show d, Eq d, Data d) => d -> DataBox
+
+
+instance Show DataBox where
+  show (DataBox b) = show b
+
+instance Eq DataBox where
+  (DataBox v) == (DataBox b) = 
+    if (typeOf v == typeOf b)
+    then True
+    else False
+
+instance Typeable DataBox where
+  typeOf (DataBox d) = typeOf d
+
+instance Data (DataBox) where
+  gfoldl k z (DataBox d) = z DataBox `k` d -- OK gfoldl x1 x2 v
+
+  gunfold k z c = error "my gungold" -- k (z DataBox)  -- OK gunfold d --  -- 
+  toConstr (DataBox d) = toConstr d -- OK
+  dataTypeOf (DataBox d) = dataTypeOf d -- OK
+  -- dataCast1 = gcast1 --dataCast1 d
+  -- dataCast2 = gcast2 -- dataCast2 d 

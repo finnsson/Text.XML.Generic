@@ -257,29 +257,5 @@ contentText c = [Text (CData CDataText c Nothing)]
 data DataBox where
   DataBox :: (Show d, Eq d, Data d) => d -> DataBox
 
-
 instance Show DataBox where
   show (DataBox b) = show b
-
-instance Eq DataBox where
-  (DataBox v) == (DataBox b) = 
-    if (typeOf v == typeOf b)
-    then True
-    else False
-
-instance Typeable DataBox where
-  typeOf (DataBox d) = typeOf d
-
--- deriving instance Data DataBox
-
--- instance Data (DataBox) where
---   gfoldl k z (DataBox d) = z DataBox `k` d -- OK gfoldl x1 x2 v
--- 
---   gunfold k z c = k (z dataBox) -- (DataBox::d->DataBox d)) -- error "my gungold" -- k (z DataBox)  -- OK gunfold d --  -- 
---   toConstr (DataBox d) = toConstr d -- OK
---   dataTypeOf (DataBox d) = dataTypeOf d -- OK
---   -- dataCast1 = gcast1 --dataCast1 d
---   -- dataCast2 = gcast2 -- dataCast2 d
-
-dataBox :: forall d. (Data d, Show d, Eq d) => d -> DataBox
-dataBox x = DataBox x

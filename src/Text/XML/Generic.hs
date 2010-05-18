@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, PackageImports, GADTs, RankNTypes #-}
+{-# LANGUAGE DeriveDataTypeable, PackageImports, GADTs, RankNTypes, StandaloneDeriving #-}
 module Text.XML.Generic (
   decodeUnknownXML,
   fromUnknownXML,
@@ -27,8 +27,8 @@ import Char
 
 import "mtl" Control.Monad.State
 
-decodeUnknownXML :: String -> DataBox
-decodeUnknownXML xml = maybe undefined fromUnknownXML (parseXMLDoc xml)
+decodeUnknownXML :: Data a => String -> (a -> b) -> b
+decodeUnknownXML xml fn = fn $ decodeXML xml --  maybe undefined fromUnknownXML (parseXMLDoc xml)
 
 decodeXML :: Data a => String -> a
 decodeXML xml = maybe undefined fromXML (parseXMLDoc xml)
@@ -52,28 +52,30 @@ stringFromXML x = res
 
 type F a = Element -> a
 
+fromUnknownXML :: Data a => Element -> (a -> b) -> b
+fromUnknownXML xml fn = fn $ fromXML xml
 
-fromUnknownXML :: Element -> DataBox
-fromUnknownXML x = res
-  where
-    res = evalState ( fromConstrM f con ) children
-        where f :: (Data a) => State [Element] a
-              f = do es <- get
-                     do put (tail es)
-                        return $ fromXML (head es)
-    -- get type of first term from e
-    qname = qName $ elName x
-    xmlnss = filter (\(Attr k v) -> "xmlns" == (qName k))  $ elAttribs x
-    name = (if length xmlnss == 1 then (attrVal $ head xmlnss) ++ "." else "") ++ qname
-    -- 
-    myDataType :: DataType
-    myDataType = dataTypeOf res
-
-    children :: [Element]
-    children = [e | Elem e <- (elContent x)]
-
-    con :: Constr
-    con = fromMaybe undefined $ readConstr myDataType qname
+-- fromUnknownXML :: Element -> DataBox
+-- fromUnknownXML x = res
+--   where
+--     res = evalState ( fromConstrM f con ) children
+--         where f :: (Data a) => State [Element] a
+--               f = do es <- get
+--                      do put (tail es)
+--                         return $ fromXML (head es)
+--     -- get type of first term from e
+--     qname = qName $ elName x
+--     xmlnss = filter (\(Attr k v) -> "xmlns" == (qName k))  $ elAttribs x
+--     name = (if length xmlnss == 1 then (attrVal $ head xmlnss) ++ "." else "") ++ qname
+--     -- 
+--     myDataType :: DataType
+--     myDataType = dataTypeOf res
+-- 
+--     children :: [Element]
+--     children = [e | Elem e <- (elContent x)]
+-- 
+--     con :: Constr
+--     con = fromMaybe undefined $ readConstr myDataType qname
 
 fromXML :: Data d => Element -> d
 fromXML e = fromXML'' e'
@@ -268,11 +270,16 @@ instance Eq DataBox where
 instance Typeable DataBox where
   typeOf (DataBox d) = typeOf d
 
-instance Data (DataBox) where
-  gfoldl k z (DataBox d) = z DataBox `k` d -- OK gfoldl x1 x2 v
+-- deriving instance Data DataBox
 
-  gunfold k z c = error "my gungold" -- k (z DataBox)  -- OK gunfold d --  -- 
-  toConstr (DataBox d) = toConstr d -- OK
-  dataTypeOf (DataBox d) = dataTypeOf d -- OK
-  -- dataCast1 = gcast1 --dataCast1 d
-  -- dataCast2 = gcast2 -- dataCast2 d 
+-- instance Data (DataBox) where
+--   gfoldl k z (DataBox d) = z DataBox `k` d -- OK gfoldl x1 x2 v
+-- 
+--   gunfold k z c = k (z dataBox) -- (DataBox::d->DataBox d)) -- error "my gungold" -- k (z DataBox)  -- OK gunfold d --  -- 
+--   toConstr (DataBox d) = toConstr d -- OK
+--   dataTypeOf (DataBox d) = dataTypeOf d -- OK
+--   -- dataCast1 = gcast1 --dataCast1 d
+--   -- dataCast2 = gcast2 -- dataCast2 d
+
+dataBox :: forall d. (Data d, Show d, Eq d) => d -> DataBox
+dataBox x = DataBox x

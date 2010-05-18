@@ -153,4 +153,4 @@ case_serialize_unknown_Voo =
 -- deserializing to unknown data type
 
 case_Deserialize_unknown_True =
-  DataBox True @=? (decodeUnknownXML "<Bool>True</Bool>")
+  True @=? (decodeUnknownXML "<Bool>True</Bool>" (&& True))

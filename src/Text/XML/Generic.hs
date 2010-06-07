@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, PackageImports, GADTs, RankNTypes, StandaloneDeriving #-}
 module Text.XML.Generic (
   decodeUnknownXML,
+  decodeUnknownXML',
   fromUnknownXML,
   decodeXML,
   fromXML,
@@ -11,7 +12,7 @@ module Text.XML.Generic (
   )  where
 
 import Text.XML.Light
-import Data.Generics.Aliases
+import Data.Generics
 import Data.List.Split
 import Data.List
 import Data.Data
@@ -26,6 +27,11 @@ import qualified Data.IntSet as I
 import Char
 
 import "mtl" Control.Monad.State
+
+-- FROM
+
+decodeUnknownXML' :: String -> DataBox
+decodeUnknownXML' xml = maybe undefined fromUnknownXML' (parseXMLDoc xml)
 
 decodeUnknownXML :: Data a => String -> (a -> b) -> b
 decodeUnknownXML xml fn = fn $ decodeXML xml --  maybe undefined fromUnknownXML (parseXMLDoc xml)
@@ -55,27 +61,28 @@ type F a = Element -> a
 fromUnknownXML :: Data a => Element -> (a -> b) -> b
 fromUnknownXML xml fn = fn $ fromXML xml
 
--- fromUnknownXML :: Element -> DataBox
--- fromUnknownXML x = res
---   where
---     res = evalState ( fromConstrM f con ) children
---         where f :: (Data a) => State [Element] a
---               f = do es <- get
---                      do put (tail es)
---                         return $ fromXML (head es)
---     -- get type of first term from e
---     qname = qName $ elName x
---     xmlnss = filter (\(Attr k v) -> "xmlns" == (qName k))  $ elAttribs x
---     name = (if length xmlnss == 1 then (attrVal $ head xmlnss) ++ "." else "") ++ qname
---     -- 
---     myDataType :: DataType
---     myDataType = dataTypeOf res
--- 
---     children :: [Element]
---     children = [e | Elem e <- (elContent x)]
--- 
---     con :: Constr
---     con = fromMaybe undefined $ readConstr myDataType qname
+fromUnknownXML' :: Element -> DataBox
+fromUnknownXML' x = res
+  where
+    res = evalState ( fromConstrM f con ) children
+        where f :: (Data a) => State [Element] a
+              f = do es <- get
+                     -- let e' = if length es == 0 then (error "es is zero") else es
+                     do put (tail es)
+                        return $ fromXML (head es)
+    -- get type of first term from e
+    qname = qName $ elName x
+    xmlnss = filter (\(Attr k v) -> "xmlns" == (qName k))  $ elAttribs x
+    name = (if length xmlnss == 1 then (attrVal $ head xmlnss) ++ "." else "") ++ qname
+    -- 
+    myDataType :: DataType
+    myDataType = dataTypeOf res
+
+    children :: [Element]
+    children = [e | Elem e <- (elContent x)]
+
+    con :: Constr
+    con = fromMaybe undefined $ readConstr myDataType qname
 
 fromXML :: Data d => Element -> d
 fromXML e = fromXML'' e'
@@ -96,9 +103,15 @@ fromXML e = fromXML'' e'
       `extR` (primitiveFromXML :: F Int64)
       `extR` (primitiveFromXML :: F Double)
       `extR` (primitiveFromXML :: F Float)
-    e' = if (isUpper $ head $ qName $ elName e)
-         then e
-         else head $ [e | Elem e <- (elContent e)]
+    e' = if (qName $ elName e) == []
+         then (error $ "qName in fromXML is []. e: " ++ show e) :: Element
+         else
+           if (isUpper $ head $ qName $ elName e)
+           then e
+           else 
+             if  length [e | Elem e <- (elContent e)] == 0
+             then (error $ "elContent in e in fromXML is []. e: " ++ show e) :: Element
+             else head $ [e | Elem e <- (elContent e)]
 
 
 fromXML' :: Data b => Element -> b
@@ -134,6 +147,8 @@ fromXML' x = res
     myDataType :: DataType
     myDataType = dataTypeOf res
     
+
+-- TO
 
 encodeUnknownXML :: DataBox -> String
 encodeUnknownXML (DataBox b) =  encodeXML b --showElement $ toXML b
@@ -192,7 +207,7 @@ toXML = toXMLgeneric
         `extQ` (showXml :: T S.ByteString)
         `extQ` (showXml :: T L.ByteString)
 
-       
+      
 toXMLgeneric :: (Data a) => a -> Element
 toXMLgeneric x =
   let dtr = dataTypeRep $ dataTypeOf x
@@ -259,3 +274,22 @@ data DataBox where
 
 instance Show DataBox where
   show (DataBox b) = show b
+
+instance Typeable DataBox where
+  typeOf _ = mkTyConApp (mkTyCon "DataBox") []
+
+instance Data DataBox where
+  gfoldl k z (DataBox d) = z DataBox `k` d
+  gunfold k z c =  (if True then k (z dbBool) else k (z db))
+          
+  toConstr (DataBox d) = toConstr d
+  dataTypeOf (DataBox d) = dataTypeOf d
+
+db :: (Integer -> DataBox)
+db = DataBox
+
+dbBool :: (Bool -> DataBox)
+dbBool = DataBox
+
+instance Eq DataBox where
+  (==) = geq

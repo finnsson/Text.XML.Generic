@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, PackageImports, GADTs, RankNTypes, StandaloneDeriving #-}
+{-# LANGUAGE DeriveDataTypeable, PackageImports, GADTs, RankNTypes #-}
 module Text.XML.Generic (
   decodeUnknownXML,
   decodeUnknownXML',
@@ -17,14 +17,14 @@ import Data.List.Split
 import Data.List
 import Data.Data
 import Utilities.Misc
-import Maybe
+import Data.Maybe
 
 import Data.Int
 import Data.Word
 import qualified Data.ByteString.Char8 as S
 import qualified Data.ByteString.Lazy.Char8 as L
 import qualified Data.IntSet as I
-import Char
+import Data.Char
 
 import "mtl" Control.Monad.State
 
@@ -34,7 +34,7 @@ decodeUnknownXML' :: String -> DataBox
 decodeUnknownXML' xml = maybe undefined fromUnknownXML' (parseXMLDoc xml)
 
 decodeUnknownXML :: Data a => String -> (a -> b) -> b
-decodeUnknownXML xml fn = fn $ decodeXML xml --  maybe undefined fromUnknownXML (parseXMLDoc xml)
+decodeUnknownXML xml fn = fn $ decodeXML xml
 
 decodeXML :: Data a => String -> a
 decodeXML xml = maybe undefined fromXML (parseXMLDoc xml)
@@ -50,11 +50,10 @@ primitiveFromXML x = parsed -- res
 stringFromXML :: Element -> String
 stringFromXML x = res
   where
-    res = if length cont == 0 then "" else contentString $ head cont -- $ elContent x
+    res = if null cont then "" else contentString $ head cont
     cont = elContent x
     contentString (Text (CData _ t _)) = t
     contentString _ = ""
-    -- getContent = showContent $ head $ elContent x
 
 type F a = Element -> a
 
@@ -67,22 +66,18 @@ fromUnknownXML' x = res
     res = evalState ( fromConstrM f con ) children
         where f :: (Data a) => State [Element] a
               f = do es <- get
-                     -- let e' = if length es == 0 then (error "es is zero") else es
                      do put (tail es)
                         return $ fromXML (head es)
     -- get type of first term from e
-    qname = qName $ elName x
-    xmlnss = filter (\(Attr k v) -> "xmlns" == (qName k))  $ elAttribs x
-    name = (if length xmlnss == 1 then (attrVal $ head xmlnss) ++ "." else "") ++ qname
-    -- 
+    name = qName $ elName x
     myDataType :: DataType
     myDataType = dataTypeOf res
 
     children :: [Element]
-    children = [e | Elem e <- (elContent x)]
+    children = [e | Elem e <- elContent x]
 
     con :: Constr
-    con = fromMaybe undefined $ readConstr myDataType qname
+    con = fromMaybe undefined $ readConstr myDataType name
 
 fromXML :: Data d => Element -> d
 fromXML e = fromXML'' e'
@@ -103,15 +98,15 @@ fromXML e = fromXML'' e'
       `extR` (primitiveFromXML :: F Int64)
       `extR` (primitiveFromXML :: F Double)
       `extR` (primitiveFromXML :: F Float)
-    e' = if (qName $ elName e) == []
-         then (error $ "qName in fromXML is []. e: " ++ show e) :: Element
+    e' = if qName ( elName e) == []
+         then error $ "qName in fromXML is []. e: " ++ show e :: Element
          else
-           if (isUpper $ head $ qName $ elName e)
+           if isUpper $ head $ qName $ elName e
            then e
            else 
-             if  length [e | Elem e <- (elContent e)] == 0
-             then (error $ "elContent in e in fromXML is []. e: " ++ show e) :: Element
-             else head $ [e | Elem e <- (elContent e)]
+             if  null [e | Elem e <- elContent e]
+             then error $ "elContent in e in fromXML is []. e: " ++ show e :: Element
+             else head [e | Elem e <- elContent e]
 
 
 fromXML' :: Data b => Element -> b
@@ -125,13 +120,12 @@ fromXML' x = res
                      do put (tail es)
                         return $ fromXML (head es)
       CharRep -> fromConstr $ mkCharConstr myDataType (head getContent)
-      -- _ -> (error "no") `extR` (primitiveFromXML x :: b)
       NoRep -> error "no"
       _ -> error "This case should not occur."
 
     -- FIX! I need to sort the children in the order con needs them!
     children :: [Element]
-    children = [e | Elem e <- (elContent x)]
+    children = [e | Elem e <- elContent x]
 
     getContent :: String
     getContent = showContent $ head $ elContent x
@@ -151,7 +145,7 @@ fromXML' x = res
 -- TO
 
 encodeUnknownXML :: DataBox -> String
-encodeUnknownXML (DataBox b) =  encodeXML b --showElement $ toXML b
+encodeUnknownXML (DataBox b) =  encodeXML b
 
 toUnknownXML :: DataBox -> Element
 toUnknownXML (DataBox b) = toXML b
@@ -259,10 +253,7 @@ element name ns content =
     , elLine = Nothing
   }
   where
-    namespace =
-      case ns of
-        Nothing -> []
-        Just n -> [Attr (QName "xmlns" Nothing Nothing) n] -- ("http://www.haskell.org/hoogle/?hoogle=" ++ n)]
+    namespace = []
 
 contentText c = [Text (CData CDataText c Nothing)]
 
@@ -280,7 +271,7 @@ instance Typeable DataBox where
 
 instance Data DataBox where
   gfoldl k z (DataBox d) = z DataBox `k` d
-  gunfold k z c =  (if True then k (z dbBool) else k (z db))
+  gunfold k z c = error "gunfold in DataBox"
           
   toConstr (DataBox d) = toConstr d
   dataTypeOf (DataBox d) = dataTypeOf d

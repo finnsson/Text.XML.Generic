@@ -56,20 +56,20 @@ prop_DecodeString s = s == (decodeXML ( showElement blank_element {
   where t = s::String
 
 case_DecodeVoo =
-  do let actual = decodeXML "<Voo xmlns=\"http://www.haskell.org/hoogle/?hoogle=Text.XML.TestGeneric\" />" :: Voo
+  do let actual = decodeXML "<Voo />" :: Voo
          expected =  Voo
      expected @=? actual
 
 case_DecodeVooz =
-  do let actual = decodeXML "<Vooz xmlns=\"http://www.haskell.org/hoogle/?hoogle=Text.XML.TestGeneric\"><Integer>99</Integer></Vooz>" :: Voo
+  do let actual = decodeXML "<Vooz><Integer>99</Integer></Vooz>" :: Voo
          expected =  Vooz 99
      expected @=? actual
 
 case_DecodeBar =
   do let actual = decodeXML
-           ("<Bar xmlns=\"http://www.haskell.org/hoogle/?hoogle=Text.XML.TestGeneric\">" ++
+           ("<Bar>" ++
            "<barA><String>Jaja</String></barA>" ++
-           "<barB><Goo xmlns=\"http://www.haskell.org/hoogle/?hoogle=Text.XML.TestGeneric\"><String></String><String>Nejnej</String></Goo></barB></Bar>") :: Bar
+           "<barB><Goo><String></String><String>Nejnej</String></Goo></barB></Bar>") :: Bar
          expected =  Bar "Jaja" $ Goo "" "Nejnej" 
      expected @=? actual
 
@@ -96,20 +96,20 @@ prop_String s = encodeXML s == showElement blank_element {
   where t = s::String
 
 case_Encode_Voo =
-  do let expected = "<Voo xmlns=\"Text.XML.TestGeneric\" />"
+  do let expected = "<Voo />"
          actual = encodeXML Voo
      expected @=? actual
 
 case_Encode_Vooz =
-  do let expected = "<Vooz xmlns=\"Text.XML.TestGeneric\"><Integer>99</Integer></Vooz>"
+  do let expected = "<Vooz><Integer>99</Integer></Vooz>"
          actual = encodeXML $ Vooz 99
      expected @=? actual
 
 case_Encode_Bar =
   do let expected =
-           "<Bar xmlns=\"Text.XML.TestGeneric\">" ++
+           "<Bar>" ++
            "<barA><String>Jaja</String></barA>" ++
-           "<barB><Goo xmlns=\"Text.XML.TestGeneric\"><String></String><String>Nejnej</String></Goo></barB></Bar>"
+           "<barB><Goo><String></String><String>Nejnej</String></Goo></barB></Bar>"
          actual = encodeXML $ Bar "Jaja" $ Goo "" "Nejnej" 
      expected @=? actual
 
@@ -145,7 +145,7 @@ case_serialize_unknown_Integer =
      expected @=? actual
 
 case_serialize_unknown_Voo =
-  do let expected = "<Voo xmlns=\"Text.XML.TestGeneric\" />"
+  do let expected = "<Voo />"
          d = DataBox Voo
          actual = encodeUnknownXML d
      expected @=? actual

@@ -6,9 +6,13 @@ The API is similar to Text.JSON.Generic.
 
 ## Serialize ##
 
-There are two functions for serialization
+There are three functions for serialization
 
     encodeXML :: Data a => a -> String
+
+,
+
+    encodeUnknownXML :: DataBox -> String
 
 and
 
@@ -34,9 +38,17 @@ turns into
 
 ## Deserialize ##
 
-There are two functions for deserialization.
+There are four functions for deserialization.
+
+   decodeUnknownXML :: Data a => String -> (a -> b) -> b
+
+,
 
     decodeXML :: Data a => String -> a
+
+,
+
+   fromUnknownXML :: Data a => Element -> (a -> b) -> b
 
 and
 

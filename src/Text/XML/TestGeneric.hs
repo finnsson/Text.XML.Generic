@@ -23,7 +23,7 @@ import Text.XML.Generic
 import Text.XML.Light
 import Data.Generics.Aliases
 import Data.Data
-import Utilities.Misc
+-- import Utilities.Misc
 
 import Data.Char
 

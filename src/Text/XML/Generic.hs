@@ -1,13 +1,15 @@
-{-# LANGUAGE DeriveDataTypeable, PackageImports, GADTs, RankNTypes #-}
+{-# LANGUAGE DeriveDataTypeable, PackageImports, GADTs, RankNTypes, TypeSynonymInstances, FlexibleInstances, UndecidableInstances, TypeSynonymInstances #-}
 module Text.XML.Generic (
+  -- ** Decode
   decodeUnknownXML,
-  decodeUnknownXML',
   fromUnknownXML,
   decodeXML,
   fromXML,
+  -- ** Encode
   encodeUnknownXML,
   encodeXML,
   toXML,
+  -- ** DataBox
   DataBox (..)
   )  where
 
@@ -16,7 +18,7 @@ import Data.Generics
 import Data.List.Split
 import Data.List
 import Data.Data
-import Utilities.Misc
+import NIB.String
 import Data.Maybe
 
 import Data.Int
@@ -28,10 +30,8 @@ import Data.Char
 
 import "mtl" Control.Monad.State
 
--- FROM
-
-decodeUnknownXML' :: String -> DataBox
-decodeUnknownXML' xml = maybe undefined fromUnknownXML' (parseXMLDoc xml)
+--------------------------------------------------------------------------
+-- ** Decode
 
 decodeUnknownXML :: Data a => String -> (a -> b) -> b
 decodeUnknownXML xml fn = fn $ decodeXML xml
@@ -59,25 +59,6 @@ type F a = Element -> a
 
 fromUnknownXML :: Data a => Element -> (a -> b) -> b
 fromUnknownXML xml fn = fn $ fromXML xml
-
-fromUnknownXML' :: Element -> DataBox
-fromUnknownXML' x = res
-  where
-    res = evalState ( fromConstrM f con ) children
-        where f :: (Data a) => State [Element] a
-              f = do es <- get
-                     do put (tail es)
-                        return $ fromXML (head es)
-    -- get type of first term from e
-    name = qName $ elName x
-    myDataType :: DataType
-    myDataType = dataTypeOf res
-
-    children :: [Element]
-    children = [e | Elem e <- elContent x]
-
-    con :: Constr
-    con = fromMaybe undefined $ readConstr myDataType name
 
 fromXML :: Data d => Element -> d
 fromXML e = fromXML'' e'
@@ -142,7 +123,8 @@ fromXML' x = res
     myDataType = dataTypeOf res
     
 
--- TO
+--------------------------------------------------------------------------
+-- ** Encode
 
 encodeUnknownXML :: DataBox -> String
 encodeUnknownXML (DataBox b) =  encodeXML b
@@ -284,3 +266,4 @@ dbBool = DataBox
 
 instance Eq DataBox where
   (==) = geq
+

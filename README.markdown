@@ -40,7 +40,7 @@ turns into
 
 There are four functions for deserialization.
 
-   decodeUnknownXML :: Data a => String -> (a -> b) -> b
+    decodeUnknownXML :: Data a => String -> (a -> b) -> b
 
 ,
 
@@ -48,7 +48,7 @@ There are four functions for deserialization.
 
 ,
 
-   fromUnknownXML :: Data a => Element -> (a -> b) -> b
+    fromUnknownXML :: Data a => Element -> (a -> b) -> b
 
 and
 

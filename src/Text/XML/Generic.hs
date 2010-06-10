@@ -1,15 +1,11 @@
 {-# LANGUAGE DeriveDataTypeable, PackageImports, GADTs, RankNTypes, TypeSynonymInstances, FlexibleInstances, UndecidableInstances, TypeSynonymInstances #-}
 module Text.XML.Generic (
   -- ** Decode
-  -- decodeUnknownXML,
   decodeXML,
   fromXML,
   -- ** Encode
-  encodeUnknownXML,
   encodeXML,
-  toXML,
-  -- ** DataBox
-  DataBox (..)
+  toXML
   )  where
 
 import Text.XML.Light
@@ -131,12 +127,6 @@ fromXML' x = res
 --------------------------------------------------------------------------
 -- ** Encode
 
-encodeUnknownXML :: DataBox -> String
-encodeUnknownXML (DataBox b) =  encodeXML b
-
-toUnknownXML :: DataBox -> Element
-toUnknownXML (DataBox b) = toXML b
-
 -- \ Encode a Data into a String.
 -- .
 -- E.g.
@@ -242,26 +232,3 @@ element name ns content =
     namespace = []
 
 contentText c = [Text (CData CDataText c Nothing)]
-
-
--- Data type
-
-data DataBox where
-  DataBox :: (Show d, Eq d, Data d) => d -> DataBox
-
-instance Show DataBox where
-  show (DataBox b) = show b
-
-instance Typeable DataBox where
-  typeOf _ = mkTyConApp (mkTyCon "DataBox") []
-
-instance Data DataBox where
-  gfoldl k z (DataBox d) = z DataBox `k` d
-  gunfold k z c = error "gunfold in DataBox"
-          
-  toConstr (DataBox d) = toConstr d
-  dataTypeOf (DataBox d) = dataTypeOf d
-
-instance Eq DataBox where
-  (==) = geq
-

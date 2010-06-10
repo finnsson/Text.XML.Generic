@@ -128,26 +128,3 @@ data Foo = Goo String String
 
 data Bar = Bar { barA :: String, barB :: Foo}
 	deriving (Show, Eq, Typeable, Data)
-
-
--- Difficult scenarios
-
--- serializing from unknown data type
-case_serialize_unknown_True =
-  do let expected = "<Bool>True</Bool>"
-         d = DataBox True
-         actual = encodeUnknownXML d
-     expected @=? actual
-
-
-case_serialize_unknown_Integer =
-  do let expected = "<Integer>42</Integer>"
-         d = DataBox (42 :: Integer)
-         actual = encodeUnknownXML d
-     expected @=? actual
-
-case_serialize_unknown_Voo =
-  do let expected = "<Voo />"
-         d = DataBox Voo
-         actual = encodeUnknownXML d
-     expected @=? actual

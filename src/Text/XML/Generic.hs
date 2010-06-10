@@ -183,18 +183,15 @@ toXMLgeneric :: (Data a) => a -> Element
 toXMLgeneric x =
   let dtr = dataTypeRep $ dataTypeOf x
   in case dtr of
-        AlgRep _ -> element algName algNsName $ baker $ map Elem $ gmapQ toXML x
+        AlgRep _ -> element algName $ baker $ map Elem $ gmapQ toXML x
 		where	name = splitWhen (== '.') $ dataTypeName $ dataTypeOf x
 			algName = typeName x
-			algNsName =	if algName == "Tuple"
-					then Nothing
-					else Just $ foldl (++) "" $ intersperse "." $ init name
 			fields :: [String]
 			fields = constrFields $ toConstr x
 			baker :: [Content] -> [Content]
 			baker conts  = if fields == [] 
 				then conts 
-				else map (\(f,c) -> Elem (element f Nothing [c]) ) (zip fields conts)
+				else map (\(f,c) -> Elem (element f [c]) ) (zip fields conts)
         _ -> error "Only AlgRep should get here!"
 
 typeName :: Data a =>a -> String
@@ -209,26 +206,22 @@ xmlList :: Data a => [a] -> Element
 xmlList xs = Element (QName "List" Nothing Nothing) [] (map (Elem . toXML) xs) Nothing
 
 showXmlTuple2 :: (Data a, Data b) => (a, b) -> Element
-showXmlTuple2 x = element "Tuple" Nothing [Elem $ toXML (fst x), Elem $ toXML (snd x)]
+showXmlTuple2 x = element "Tuple" [Elem $ toXML (fst x), Elem $ toXML (snd x)]
 
-showXmlString x = element "String" Nothing (contentText x)
+showXmlString x = element "String" (contentText x)
 
-showXmlUnit x = element "Unit" Nothing []
+showXmlUnit x = element "Unit" []
 
-showXml x = element elemName nsName $ contentText (toString x)
+showXml x = element elemName $ contentText (toString x)
   where name = splitWhen (== '.') $ dataTypeName $ dataTypeOf x
         elemName = last name
-        nsName = Nothing
 
-
-element name ns content =
+element name content =
   Element {
     elName = QName {qName = name, qURI = Nothing, qPrefix = Nothing}
-    , elAttribs = namespace
+    , elAttribs = []
     , elContent =  content 
     , elLine = Nothing
   }
-  where
-    namespace = []
 
 contentText c = [Text (CData CDataText c Nothing)]

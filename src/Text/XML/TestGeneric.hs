@@ -31,50 +31,52 @@ main = $(defaultMainGenerator)
 
 -- Decode
 
+type E a = Either String a
+
 case_DecodeString =
-  do let expected = ""
-         actual = decodeXML "<String />" :: String
+  do let expected = Right ""
+         actual = decodeXML "<String />" :: E String
      expected @=? actual
 
 case_DecodeArrowString =
-  do let expected = ">"
-         actual = decodeXML "<String>&gt;</String>" :: String
+  do let expected = Right ">"
+         actual = decodeXML "<String>&gt;</String>" :: E String
      expected @=? actual
 
 case_DecodeInteger =
-  do let expected = 56
-         actual = decodeXML "<Integer>56</Integer>" :: Integer
+  do let expected = Right 56
+         actual = decodeXML "<Integer>56</Integer>" :: E Integer
      expected @=? actual
 
-prop_DecodeInteger i = i == (decodeXML ( "<Integer>" ++ show i ++ "</Integer>" ) :: Integer)
+prop_DecodeInteger i = Right i == (decodeXML ( "<Integer>" ++ show i ++ "</Integer>" ) :: E Integer)
   where t = i::Integer
 
-prop_DecodeString s = s == (decodeXML ( showElement blank_element {
+prop_DecodeString s = Right s == (decodeXML ( showElement blank_element {
     elName = blank_name { qName = "String"},
     elContent = [Text $ CData CDataText s Nothing]
-  } ) :: String) || '\r' `elem` s
+  } ) :: E String) || '\r' `elem` s
   where t = s::String
 
 case_DecodeVoo =
-  do let actual = decodeXML "<Voo />" :: Voo
-         expected =  Voo
+  do let actual = decodeXML "<Voo />" :: E Voo
+         expected = Right Voo
      expected @=? actual
 
 case_DecodeVooz =
-  do let actual = decodeXML "<Vooz><Integer>99</Integer></Vooz>" :: Voo
-         expected =  Vooz 99
+  do let actual = decodeXML "<Vooz><Integer>99</Integer></Vooz>" :: E Voo
+         expected = Right $ Vooz 99
      expected @=? actual
 
 case_DecodeBar =
   do let actual = decodeXML
            ("<Bar>" ++
            "<barA><String>Jaja</String></barA>" ++
-           "<barB><Goo><String></String><String>Nejnej</String></Goo></barB></Bar>") :: Bar
-         expected =  Bar "Jaja" $ Goo "" "Nejnej" 
+           "<barB><Goo><String></String><String>Nejnej</String></Goo></barB></Bar>") :: E Bar
+         expected = Right $ Bar "Jaja" $ Goo "" "Nejnej" 
      expected @=? actual
 
 case_Decode_Bool =
-  True @=? (decodeXML "<Bool>True</Bool>" :: Bool)
+  Right True @=? (decodeXML "<Bool>True</Bool>" :: E Bool)
 
 -- Encode 
 
@@ -149,8 +151,3 @@ case_serialize_unknown_Voo =
          d = DataBox Voo
          actual = encodeUnknownXML d
      expected @=? actual
-
--- deserializing to unknown data type
-
-case_Deserialize_unknown_True =
-  True @=? (decodeUnknownXML "<Bool>True</Bool>" (&& True))

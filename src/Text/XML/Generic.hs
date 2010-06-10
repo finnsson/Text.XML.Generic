@@ -1,8 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, PackageImports, GADTs, RankNTypes, TypeSynonymInstances, FlexibleInstances, UndecidableInstances, TypeSynonymInstances #-}
 module Text.XML.Generic (
   -- ** Decode
-  decodeUnknownXML,
-  fromUnknownXML,
+  -- decodeUnknownXML,
   decodeXML,
   fromXML,
   -- ** Encode
@@ -20,6 +19,7 @@ import Data.List
 import Data.Data
 import NIB.String
 import Data.Maybe
+import Data.Either
 
 import Data.Int
 import Data.Word
@@ -33,34 +33,27 @@ import "mtl" Control.Monad.State
 --------------------------------------------------------------------------
 -- ** Decode
 
-decodeUnknownXML :: Data a => String -> (a -> b) -> b
-decodeUnknownXML xml fn = fn $ decodeXML xml
+decodeXML :: Data a => String -> Either String a
+decodeXML xml = maybe (Left "Could not parse xml in decodeXML") fromXML (parseXMLDoc xml)
 
-decodeXML :: Data a => String -> a
-decodeXML xml = maybe undefined fromXML (parseXMLDoc xml)
-
-
-primitiveFromXML :: (Read d, Data d) => Element -> d
-primitiveFromXML x = parsed -- res
+primitiveFromXML :: (Read d, Data d) => Element -> Either String d
+primitiveFromXML x = parsed
   where
-    parsed = read getContent
-    getContent = showContent $ head $ elContent x
-    myDataType = dataTypeOf parsed -- res
+    parsed = maybe (Left "No content.") (\c -> Right $ read $ showContent c ) getContent
+    getContent = listToMaybe $ elContent x
+    myDataType = dataTypeOf parsed
 
-stringFromXML :: Element -> String
-stringFromXML x = res
+stringFromXML :: Element -> Either String String
+stringFromXML x = Right $ res
   where
     res = if null cont then "" else contentString $ head cont
     cont = elContent x
     contentString (Text (CData _ t _)) = t
     contentString _ = ""
 
-type F a = Element -> a
+type F a = Element -> Either String a
 
-fromUnknownXML :: Data a => Element -> (a -> b) -> b
-fromUnknownXML xml fn = fn $ fromXML xml
-
-fromXML :: Data d => Element -> d
+fromXML :: Data d => Element -> Either String d
 fromXML e = fromXML'' e'
   where
     fromXML'' =
@@ -90,19 +83,28 @@ fromXML e = fromXML'' e'
              else head [e | Elem e <- elContent e]
 
 
-fromXML' :: Data b => Element -> b
+
+
+instance Monad (Either String) where
+  return v = Right v
+  fail s = Left s
+  (Left s) >>= _ = Left s
+  (Right v) >>= f = f v
+
+
+fromXML' :: Data b => Element -> Either String b
 fromXML' x = res 
   where
     res = case dataTypeRep myDataType of
-      -- AlgRep [unitConstr] -> ()
-      AlgRep _ -> evalState ( fromConstrM f con ) children
-        where f :: (Data a) => State [Element] a
+      AlgRep _ -> evalStateT ( fromConstrM f con ) children
+        where f :: (Data a) => StateT [Element] (Either String) a
               f = do es <- get
-                     do put (tail es)
-                        return $ fromXML (head es)
-      CharRep -> fromConstr $ mkCharConstr myDataType (head getContent)
-      NoRep -> error "no"
-      _ -> error "This case should not occur."
+                     case es of [] -> lift $ Left "construct: empty list"
+                                e' : es' -> do put es'; lift $ fromXML e'
+      CharRep -> maybe (Left "No content") (Right . fromConstr . (mkCharConstr myDataType)) content
+        where content = listToMaybe getContent
+      NoRep -> Left "NoRep in fromXML'"
+      _ -> Left "This case should not occur."
 
     -- FIX! I need to sort the children in the order con needs them!
     children :: [Element]
@@ -115,12 +117,15 @@ fromXML' x = res
     conRep = constrRep con
 
     con :: Constr
-    con = fromMaybe undefined $ readConstr myDataType qname
+    con = fromMaybe (error $ "No Constr by name " ++ qname ++ " and DataType " ++ (show myDataType)) $ readConstr myDataType qname
 
     qname = qName $ elName x
 
+    resType :: Either String b -> b
+    resType _ = error "resType"
+
     myDataType :: DataType
-    myDataType = dataTypeOf res
+    myDataType = dataTypeOf $ resType res
     
 
 --------------------------------------------------------------------------
@@ -213,7 +218,6 @@ typeName x = name
 xmlList :: Data a => [a] -> Element
 xmlList xs = Element (QName "List" Nothing Nothing) [] (map (Elem . toXML) xs) Nothing
 
--- showXmlTuple2 :: (Data a) => (a,a) -> Element
 showXmlTuple2 :: (Data a, Data b) => (a, b) -> Element
 showXmlTuple2 x = element "Tuple" Nothing [Elem $ toXML (fst x), Elem $ toXML (snd x)]
 
@@ -231,7 +235,7 @@ element name ns content =
   Element {
     elName = QName {qName = name, qURI = Nothing, qPrefix = Nothing}
     , elAttribs = namespace
-    , elContent =  content -- [CRef content] --
+    , elContent =  content 
     , elLine = Nothing
   }
   where
@@ -257,12 +261,6 @@ instance Data DataBox where
           
   toConstr (DataBox d) = toConstr d
   dataTypeOf (DataBox d) = dataTypeOf d
-
-db :: (Integer -> DataBox)
-db = DataBox
-
-dbBool :: (Bool -> DataBox)
-dbBool = DataBox
 
 instance Eq DataBox where
   (==) = geq

@@ -95,22 +95,16 @@ fromXML' x = res
       AlgRep _ -> evalStateT ( fromConstrM f con ) children
         where f :: (Data a) => StateT [Element] (Either String) a
               f = do es <- get
-                     case es of [] -> lift $ Left "construct: empty list"
+                     case es of [] -> lift $ Left $ "No constructor for DataType " ++ show myDataType
                                 e' : es' -> do put es'; lift $ fromXML e'
       CharRep -> maybe (Left "No content") (Right . fromConstr . (mkCharConstr myDataType)) content
-        where content = listToMaybe getContent
-      NoRep -> Left "NoRep in fromXML'"
-      _ -> Left "This case should not occur."
+        where content = listToMaybe (showContent $ head $ elContent x) 
+      NoRep -> Left $ "NoRep in fromXML' for DataType " ++ show myDataType
+      _ -> Left $ "This case should not occur in fromXML' for DataType " ++ show myDataType
 
     -- FIX! I need to sort the children in the order con needs them!
     children :: [Element]
     children = [e | Elem e <- elContent x]
-
-    getContent :: String
-    getContent = showContent $ head $ elContent x
-
-    conRep :: ConstrRep
-    conRep = constrRep con
 
     con :: Constr
     con = fromMaybe (error $ "No Constr by name " ++ qname ++ " and DataType " ++ (show myDataType)) $ readConstr myDataType qname

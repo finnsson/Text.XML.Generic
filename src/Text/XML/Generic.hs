@@ -113,7 +113,12 @@ fromXML' x =  result
 
     errorMsg = "No Constr by name " ++ qname ++ " and DataType " ++ (show myDataType)
 
-    qname = qName $ elName x
+    qname = q
+      where
+        qname' = qName $ elName x
+        q = if qname' == "Tuple"
+            then "(" ++ replicate (-1 + length children) ',' ++ ")"
+            else qname'
 
     resType :: Either String b -> b
     resType _ = error "resType"

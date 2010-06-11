@@ -97,6 +97,12 @@ prop_String s = encodeXML s == showElement blank_element {
   }
   where t = s::String
 
+case_Encode_tup2 =
+  do "<Tuple><Bool>True</Bool><Integer>42</Integer></Tuple>" @=? encodeXML (True,42 :: Integer)
+
+case_Decode_tup2 =
+  do Right (True,42::Integer) @=? (decodeXML "<Tuple><Bool>True</Bool><Integer>42</Integer></Tuple>" :: E (Bool,Integer))
+
 case_Encode_Voo =
   do let expected = "<Voo />"
          actual = encodeXML Voo

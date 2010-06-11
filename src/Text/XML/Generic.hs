@@ -50,7 +50,7 @@ stringFromXML x = Right $ res
 type F a = Element -> Either String a
 
 fromXML :: Data d => Element -> Either String d
-fromXML e = fromXML'' e'
+fromXML e = either Left fromXML'' e'
   where
     fromXML'' =
       fromXML' 
@@ -68,15 +68,16 @@ fromXML e = fromXML'' e'
       `extR` (primitiveFromXML :: F Int64)
       `extR` (primitiveFromXML :: F Double)
       `extR` (primitiveFromXML :: F Float)
+    e' :: Either String Element
     e' = if qName ( elName e) == []
-         then error $ "qName in fromXML is []. e: " ++ show e :: Element
+         then Left $ "qName in fromXML is []. e: " ++ show e
          else
            if isUpper $ head $ qName $ elName e
-           then e
+           then Right e
            else 
              if  null [e | Elem e <- elContent e]
-             then error $ "elContent in e in fromXML is []. e: " ++ show e :: Element
-             else head [e | Elem e <- elContent e]
+             then Left $ "elContent in e in fromXML is []. e: " ++ show e
+             else Right $ head [e | Elem e <- elContent e]
 
 
 
@@ -89,9 +90,10 @@ instance Monad (Either String) where
 
 
 fromXML' :: Data b => Element -> Either String b
-fromXML' x = res 
+fromXML' x =  result
   where
-    res = case dataTypeRep myDataType of
+    result = maybe (Left errorMsg) res const
+    res con = case dataTypeRep myDataType of
       AlgRep _ -> evalStateT ( fromConstrM f con ) children
         where f :: (Data a) => StateT [Element] (Either String) a
               f = do es <- get
@@ -106,8 +108,10 @@ fromXML' x = res
     children :: [Element]
     children = [e | Elem e <- elContent x]
 
-    con :: Constr
-    con = fromMaybe (error $ "No Constr by name " ++ qname ++ " and DataType " ++ (show myDataType)) $ readConstr myDataType qname
+    const :: Maybe Constr
+    const = readConstr myDataType qname
+
+    errorMsg = "No Constr by name " ++ qname ++ " and DataType " ++ (show myDataType)
 
     qname = qName $ elName x
 
@@ -115,7 +119,7 @@ fromXML' x = res
     resType _ = error "resType"
 
     myDataType :: DataType
-    myDataType = dataTypeOf $ resType res
+    myDataType = dataTypeOf $ resType result
     
 
 --------------------------------------------------------------------------
